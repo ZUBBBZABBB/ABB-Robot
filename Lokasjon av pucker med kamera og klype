@@ -1,1 +1,19 @@
-repository
+1 Introduction
+For 5.3 see 2.1 communications.py. For 5.4 see 2.2 image acquisition.py, here
+we have defined all functions we need for the camera and finding QR codes.
+In 2.3 helper funcs.py we have defined helper functions needed for pixels to
+mm, calculating robtarget, and picking up pucks.
+In cam adjust lab.py 2.4 we have the program that tries to calculate the
+slope offset off the camera.
+The ”main” program lives in 2.5 main.py, this program uses multithreading
+to show the camera feed live, while picking up pucks. We currently have two
+modes, the first you select which puck to pick up and where to place it, and the
+second it will pick up one puck and place it randomly, then go to the overview
+position and find the puck and do it again.
+We wanted to try a program that uses multiple pucks, but due to not getting
+good enough QR-code detection we didn’t manage anything here. (When there
+was multiple pucks it usually only found one, or it found both but not on the
+same frame, so it flickered between them.)
+For the robot modules, we used cam adjust.mod 2.6 for the cam adjust part.
+This one moves the robot to simple robtarget.
+For the main program we used pythoncom.mod 2.7.
