@@ -1,1 +1,223 @@
-repository
+2.5 main.py
+1 """Main program for Lab5"""
+2 import threading
+3 from time import sleep
+4 from typing import NewType
+13
+5 import random
+6
+7 from pyueye import ueye
+8 from rwsuis import RWS
+9
+10 import image_acquisition
+11 from communication import NORBERT_ADDRESS
+12 from helper_funcs import calc_robtarget, convert_to_mm
+13
+14
+15 SIMPLE_ROBTARGET = "simple_robtarget"
+16 slope_x = -0.030
+17 slope_y = 0.0
+18
+19 # To exit while loop
+20 flag = 1
+21
+22
+23 def main():
+24 # Connect to camera
+25 camera = image_acquisition.init_camera()
+26 cam_thread = threading.Thread(
+27 target=image_acquisition.video_capture, args=(camera,),
+daemon=True
+28 )
+29 cam_thread.start()
+30 # Connect to robot and start RAPID
+31 norbert = RWS.RWS(NORBERT_ADDRESS)
+32 norbert.request_mastership()
+33 norbert.motors_on()
+34 norbert.start_RAPID()
+35 # startposition = [0, 0, 500]
+36 startposition, _ = norbert.get_robtarget_variables("overview")
+37 print(startposition)
+38 old_target = startposition
+39
+40 while True: # Run script indefinitely
+41 print(
+42 """
+43 Choose what to do:
+44 1: Pick and place a single puck
+45 2: Pick pucks and place at random infinitum
+46 0: Exit
+47 """
+48 )
+49 # Program may be extended
+50 mm_from_px_overview = convert_to_mm(startposition[2])
+51 mm_from_px_300 = convert_to_mm(300)
+52 mm_from_px_100 = convert_to_mm(100)
+53 userinput = int(input("\nWhat should RAPID do?: "))
+14
+54
+55 if userinput == 1:
+56 """
+57 Pick up and place a chosen puck to a chosen location.
+58 Captures an image and finds all pucks in the work area.
+59 The user is prompted to select puck and location.
+60 Uses collision avoidance when picking up puck.
+61 """
+62 norbert.set_rapid_variable("WPW", 1) # Start case 1 in rapid
+63 norbert.wait_for_rapid() # Waits for robot to go in overview
+64 sleep(0.5)
+65
+66 # Find all pucks and ask for which puck to move
+67 print("Pick and place a single puck")
+68 positions = image_acquisition.get_qr_pos()
+69 print("Pick which puck:")
+70 for index, position in enumerate(positions):
+71 print(f"Indx: {index}, Pos: {position}")
+72
+73 inp = input("Choose puck: ")
+74 position = positions[int(inp)]
+75 print("Select where to put puck: ")
+76 x = input("x: ")
+77 y = input("y: ")
+78 z = input("z: ")
+79 norbert.set_robtarget_translation("put_puck_target", [x, y,
+z])
+80
+81 # Calculate the robtarget for the puck
+82 new_robtarget = calc_robtarget(
+83 position,
+84 old_target[2],
+85 old_target,
+86 mm_from_px_overview,
+87 slope_x=slope_x,
+88 slope_y=slope_y,
+89 )
+90
+91 # Move down to a safe heigth and calculate again
+92 puck_target = new_robtarget
+93 puck_target[2] = 100 # Safeheigth..
+94 norbert.set_robtarget_translation("puck_target", puck_target)
+95 norbert.set_rapid_variable("image_processed", "TRUE")
+96
+97 norbert.wait_for_rapid()
+98 sleep(1)
+99 position = image_acquisition.get_qr_pos()
+100
+101 puck_target = calc_robtarget(
+102 position[0],
+15
+103 puck_target[2],
+104 puck_target,
+105 mm_from_px_100,
+106 slope_x,
+107 slope_y,
+108 )
+109
+110 # Send puck target to pick up (here we say height at 0,
+111 # if there were stacked pucks we’d have to tell rapid here
+how tall)
+112 puck_target[2] = 0
+113 norbert.set_robtarget_translation("puck_target", puck_target)
+114 norbert.set_rapid_variable("image_processed", "TRUE")
+115 norbert.wait_for_rapid()
+116
+117 elif userinput == 2:
+118 global flag
+119 n=threading.Thread(target=set_flag,daemon=True)
+120 n.start()
+121 while flag:
+122 """
+123 Pick up and place a chosen puck to a chosen location.
+124 Captures an image and finds all pucks in the work area.
+125 The user is prompted to select puck and location.
+126 Uses collision avoidance when picking up puck.
+127 """
+128
+129 norbert.set_rapid_variable("WPW", 1) # Start case 1 in
+rapid
+130 norbert.wait_for_rapid() # Waits for robot to go in
+overview
+131 sleep(0.5)
+132 position = image_acquisition.get_qr_pos()
+133
+134 # Selects a random place to put the puck.
+135 x = random.randint(-80, 200)
+136 y = random.randint(-100, 200)
+137 z = 0
+138 norbert.set_robtarget_translation("put_puck_target", [x,
+y, z])
+139
+140 # Calculate puck target
+141 sleep(1)
+142 position = image_acquisition.get_qr_pos()
+143 puck_target = calc_robtarget(
+144 position[0],
+145 startposition[2],
+146 startposition,
+147 slope_x=slope_x,
+148 slope_y=slope_y,
+16
+149 )
+150
+151 # Go down to a safe heigth to calculate again
+152 puck_target[2] = 100 # Safeheigth..
+153 norbert.set_robtarget_translation("puck_target",
+puck_target)
+154 norbert.set_rapid_variable("image_processed", "TRUE")
+155 norbert.wait_for_rapid()
+156 sleep(1)
+157 position = image_acquisition.get_qr_pos()
+158
+159 puck_target = calc_robtarget(
+160 position[0],
+161 puck_target[2],
+162 puck_target,
+163 # slope_x=slope_x,
+164 # slope_y=slope_y,
+165 )
+166
+167 # Send puck target to pick up (here we say height at 0,
+168 # if there were stacked pucks we’d have to tell rapid
+here how tall)
+169 puck_target[2] = 0
+170 norbert.set_robtarget_translation("puck_target",
+puck_target)
+171 norbert.set_rapid_variable("image_processed", "TRUE")
+172 norbert.wait_for_rapid()
+173 flag = True
+174
+175 # elif userinput == 3:
+176 # norbert.set_rapid_variable("WPW", 2) # Start case 2 in rapid
+177 # norbert.wait_for_rapid() # Waits for robot to go in overview
+178 # positions = image_acquisition.get_qr_pos()
+179 # norbert.set_rapid_variable("num_of_pucks", len(positions))
+180 # positions_robtarget_start = []
+181 # for v in positions:
+182 # positions_robtarget_start.append(
+183 # calc_robtarget(
+184 # v,
+185 # old_target[2],
+186 # old_target,
+187 # mm_from_px_overview,
+188 # slope_x,
+189 # slope_y,
+190 # )
+191 # )
+192
+193 elif userinput == 0:
+194 print("Exiting Python program and turning off robot motors")
+195 norbert.start_RAPID() # Is this neccessary?
+17
+196 norbert.motors_off()
+197 norbert.stop_RAPID()
+198 break
+199
+200 def set_flag():
+201 """Press a key to stop the while loop of elif 2"""
+202 global flag
+203 keystroke = input("Press a key to exit \n")
+204 print("You pressed: ", keystroke)
+205 flag = False
+206
+207 if __name__ == "__main__":
+208 main()
