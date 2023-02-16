@@ -1,1 +1,168 @@
-repository
+2.4 cam adjust lab.py
+1 """Cam adjust, adjusts the slope of the camera to compensate when
+picking up pucks"""
+2 import os
+3 import time
+4 import threading
+5 from typing import Tuple, Optional
+6 import numpy as np
+7 from helper_funcs import convert_to_mm, calc_robtarget
+8 from communication import NORBERT_ADDRESS
+9 import image_acquisition
+10 from image_acquisition import qr_positions
+11 from rwsuis import RWS
+12 from Camera import Camera
+13
+14
+15 MM_FROM_PIXEL = convert_to_mm(400)
+16 MM_FROM_PIXEL_LOW = convert_to_mm(200)
+17
+18 # pylint: disable-msg=too-many-locals
+19 def cam_adjust(
+20 robot: RWS.RWS,
+21 current_robtarget: list,
+22 camera: Optional[Camera] = None,
+10
+23 ) -> Tuple[float, float]:
+24 """Takes robot and position and returns slope of x and y, needs live
+feed"""
+25 robtarget_pucks = [[], []]
+26 new_robtarget = current_robtarget
+27
+28 if new_robtarget[2] != 400:
+29 new_robtarget[2] = 400
+30 robot.set_robtarget_translation("simple_robtarget",
+current_robtarget)
+31
+32 with open("camera_adjustment_XS.txt", "w", encoding="UTF-8") as
+adjustment_file:
+33 # Create a loop that checks slope of camera by comparing
+34 # QR position at 400 and 200 mm height
+35 i = 0
+36 while i < 5: # Compare images 5 times
+37 # Waits in case robot is running
+38 time.sleep(1)
+39
+40 # Gets pixel position from QR code
+41
+42 position = image_acquisition.get_qr_pos() # camera)
+43
+44 # Calculates the robtarget that should be immediately above
+and move to it
+45 new_robtarget = calc_robtarget(
+46 position[0], 400, new_robtarget, MM_FROM_PIXEL
+47 )
+48 robot.set_robtarget_translation("simple_robtarget",
+new_robtarget)
+49 time.sleep(1)
+50
+51 # Goes directly down to the low position
+52 new_robtarget[2] = 200
+53 robot.set_robtarget_translation("simple_robtarget",
+new_robtarget)
+54 time.sleep(2)
+55
+56 # Calculates the robtarget from down here and saves it in
+robtarget_pucks list
+57 position = image_acquisition.get_qr_pos() # camera)
+58 robtarget_pucks[0] = calc_robtarget(
+59 position[0], 200, new_robtarget, MM_FROM_PIXEL_LOW
+60 )
+61 print(
+62 f"x: {robtarget_pucks[0][0]}, y: {robtarget_pucks[0][1]},
+\
+63 h: {robtarget_pucks[0][2]}"
+64 )
+11
+65
+66 # Goes directly up again and calculates the robtarget and
+saves it in robtarget_pucks
+67 new_robtarget[2] = 400
+68 robot.set_robtarget_translation("simple_robtarget",
+new_robtarget)
+69 time.sleep(1)
+70 position = image_acquisition.get_qr_pos() # camera)
+71 robtarget_pucks[1] = calc_robtarget(
+72 position[0], 400, new_robtarget, MM_FROM_PIXEL
+73 )
+74 print(
+75 f"x: {robtarget_pucks[1][0]}, y: {robtarget_pucks[1][1]},
+\
+76 h: {robtarget_pucks[1][2]}"
+77 )
+78
+79 # Get difference in x y coordinates from high and low
+robposition
+80 delta_y = robtarget_pucks[1][0] - robtarget_pucks[0][0]
+81 delta_x = robtarget_pucks[1][1] - robtarget_pucks[0][1]
+82 delta_height = robtarget_pucks[1][2] - robtarget_pucks[0][2]
+83 print(f"y {delta_y}, x {delta_x}, h {delta_height}")
+84
+85 # Calculate the slope values
+86 slope_x = np.arctan(delta_x / delta_height)
+87 slope_y = np.arctan(delta_y / delta_height)
+88
+89 # Write all slope values to .txt-file
+90 adjustment_file.write(f"{slope_x:.4f},{slope_y:.4f}\n")
+91 i += 1
+92
+93 # adjustment_file.close()
+94
+95 contents = np.genfromtxt(r"camera_adjustment_XS.txt", delimiter=",")
+96 os.remove("camera_adjustment_XS.txt")
+97
+98 sum_slope_x = 0
+99 sum_slope_y = 0
+100 # sum_slope_x = 0
+101 # sum_slope_y = 0
+102 for content in contents:
+103 sum_slope_x += content[0]
+104 sum_slope_y += content[1]
+105
+106 average_slope_x = sum_slope_x / len(contents)
+107 average_slope_y = sum_slope_y / len(contents)
+108 # """These slopes is what you will need to compensate for
+109 # the camera position error for more accurate picking."""
+110
+12
+111 return average_slope_x, average_slope_y
+112
+113
+114 def test_without_video_feed():
+115 xs_camera = image_acquisition.init_camera()
+116 norbert = RWS.RWS(NORBERT_ADDRESS) # Norbert’s IP address
+117 norbert.request_mastership()
+118 norbert.motors_on()
+119 norbert.start_RAPID() # NB! Starts RAPID execution from main
+120 norbert.set_robtarget_translation("simple_robtarget", [0, 0, 400])
+121 robtarget = [0, 0, 400]
+122 time.sleep(1)
+123 avg_x, avg_y = cam_adjust(norbert, robtarget, xs_camera)
+124 print(f"Average x: {avg_x}, average y: {avg_y}")
+125 norbert.motors_off()
+126 norbert.stop_RAPID()
+127
+128
+129 def test_with_video_feed():
+130 xs_camera = image_acquisition.init_camera()
+131 cam_thread = threading.Thread(
+132 target=image_acquisition.video_capture, args=(xs_camera,),
+daemon=True
+133 )
+134 cam_thread.start()
+135 norbert = RWS.RWS(NORBERT_ADDRESS) # Norbert’s IP address
+136 norbert.request_mastership()
+137 norbert.motors_on()
+138 norbert.start_RAPID() # NB! Starts RAPID execution from main
+139 norbert.set_robtarget_translation("simple_robtarget", [0, 0, 400])
+140 robtarget = [0, 0, 400]
+141 time.sleep(1)
+142 avg_x, avg_y = cam_adjust(norbert, robtarget, xs_camera)
+143 print(f"Average x: {avg_x}, average y: {avg_y}")
+144 norbert.motors_off()
+145 norbert.stop_RAPID()
+146
+147
+148 if __name__ == "__main__":
+149 test_with_video_feed()
+150 #test_without_video_feed()
