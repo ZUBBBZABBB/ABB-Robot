@@ -1,1 +1,36 @@
-repository
+2.6 cam adj.mod
+1 MODULE E458GripperTest
+2 ! Module for testing gripper, UiS KS Nov. 29, 2018
+3 VAR num WPW:=0; ! What Python Wants
+4 VAR num WRD:=0; ! What RAPID Does
+5 VAR bool ready_flag:= FALSE; ! RAPID’s ready flag
+6 VAR bool image_processed:= FALSE; ! Python’s ready flag
+7 CONST num gripHeight:= 10;
+8 CONST num safeHeight:= 60; ! Close-up image height
+9
+10 ! wobj in the middle of the table, x-axis along short side of table,
+y-axis along long axis
+11 TASK PERS wobjdata wobjTableN:=
+12 [FALSE,TRUE,"",[[150,-500,8],[0.707106781,0,0,-0.707106781]],
+13 [[0,0,0],[1,0,0,0]]];
+14 PERS tooldata tGripper:=
+15 [TRUE,[[0,0,114.25],[0,0,0,1]],[1,[-0.095984607,0.082520613,38.69176324],
+16 [1,0,0,0],0,0,0]];
+17
+18 ! robtargets
+19 VAR robtarget simple_robtarget
+:=[[0,0,100],[0,1,0,0],[-1,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+20 ! wait for python to finish processing image
+21 PROC wait_for_python()
+22 WHILE NOT image_processed DO
+23 ENDWHILE
+24 image_processed:=FALSE;
+25 ENDPROC
+26
+27 PROC main()
+28 WHILE TRUE DO
+29 MoveJ simple_robtarget, v200, z10, tGripper\WObj:=wobjTableN;
+30 ENDWHILE
+18
+31 ENDPROC
+32 ENDMODULE
