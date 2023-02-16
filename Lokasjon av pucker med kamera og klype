@@ -1,1 +1,54 @@
-repository
+2.3 helper funcs.py
+1 """Helper functions for robot/image acquisition"""
+2 from typing import Union, Optional
+3 from rwsuis import RWS
+4
+5 # working_distance = 440 #Robtarget Y + 40
+6 def convert_to_mm(
+7 working_distance: Union[int, float],
+8 sensor_width: float = 3.6288,
+9 focal_length: float = 3.7,
+10 cam_resolution: int = 1280,
+11 ) -> float:
+12 """Converts pixels to mm, default values are for XS camera"""
+13 # Konverter pixel to mm
+14 working_distance = working_distance + 40
+15 # working_distance = 400 + 40
+16 fov_width = (sensor_width / focal_length) * working_distance
+17 pixel2mm = fov_width / cam_resolution
+18 return pixel2mm
+19
+20
+21 def calc_robtarget(
+22 position: list,
+23 height: Union[int, float],
+24 old_target: list,
+25 mmppx: Optional[float] = None,
+26 slope_x: float = 0,
+27 slope_y: float = 0,
+28 ) -> list:
+29 """Calculate robot target according to CAMERA POSITION based on
+position of qr code in mm/pixels,
+9
+30 added onto the current position, if slope given add compensation
+based on height"""
+31 if mmppx == None:
+32 mmppx = convert_to_mm(height)
+33 comp_x = slope_x * height
+34 comp_y = slope_y * height
+35 position = [x * mmppx for x in position]
+36 return [old_target[0] - position[1] - comp_x, old_target[1] -
+position[0] - comp_y, height]
+37
+38
+39 def pickup_puck(robot: RWS.RWS, variable_name: str, robot_target: list):
+40 """Move down and scoop in to pick up puck
+41 (might be better to have this functionality inside robotstudio?)"""
+42 # Move to calculated robtarget
+43 robot.set_robtarget_translation(variable_name, robot_target)
+44 robot_target[2] = 10
+45 # Move right in front of puck
+46 robot.set_robtarget_translation(variable_name, robot_target)
+47 # Scoop in and pick up puck
+48 robot_target[1] += 55
+49 robot.set_robtarget_translation(variable_name, robot_target)
