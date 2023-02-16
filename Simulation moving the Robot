@@ -1,0 +1,74 @@
+MODULE Module1
+        PERS tooldata UISpenholder:=[TRUE,[[0,0,110],[1,0,0,0]],[1,[0,0,1],[1,0,0,0],0,0,0]];
+    TASK PERS wobjdata wobj_Table1:=[FALSE,TRUE,"",[[525,-625,8],[0.707106781,0,0,0.707106781]],[[425,-150,308],[1,0,0,0]]];
+    CONST robtarget Target_10:=[[400,300,0],[0,-0.707106781,0.707106781,0],[0,0,-2,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget Target_20:=[[400,0,0],[0,-0.707106781,0.707106781,0],[0,0,-2,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget Target_30:=[[0,0,0],[0,-0.707106781,0.707106781,0],[-1,0,1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget Target_40:=[[0,300,0],[0,-0.707106781,0.707106781,0],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget Target_50:=[[100,275,15],[0,-0.707106781,0.707106781,0],[-1,0,1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget Target_60:=[[100,25,15],[0,-0.707106781,0.707106781,0],[-1,0,1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget Target_70:=[[300,25,15],[0,-0.707106781,0.707106781,0],[0,0,-2,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget Target_80:=[[300,275,15],[0,-0.707106781,0.707106781,0],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget Target_100:=[[275,250,34],[0,-0.707106781,0.707106781,0],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget Target_110:=[[275,250,22],[0,-0.707106781,0.707106781,0],[0,0,-2,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget Target_120:=[[275,50,34],[0,-0.707106781,0.707106781,0],[0,0,-2,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget Target_130:=[[275,50,22],[0,-0.707106781,0.707106781,0],[0,0,-2,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget Target_140:=[[125,50,34],[0,-0.707106781,0.707106781,0],[-1,0,1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget Target_150:=[[125,50,22],[0,-0.707106781,0.707106781,0],[-1,0,1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget Target_160:=[[125,244,34],[0,-0.707106781,0.707106781,0],[-1,0,1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget Target_170:=[[125,244,22],[0,-0.707106781,0.707106781,0],[-1,0,1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+!***********************************************************
+    !
+    ! Module:  Module1
+    !
+    ! Description:
+    !   <Insert description here>
+    !
+    ! Author: stig9
+    !
+    ! Version: 1.0
+    !
+    !***********************************************************
+    
+    
+    !***********************************************************
+    !
+    ! Procedure main
+    !
+    !   This is the entry point of your program
+    !
+    !***********************************************************
+    PROC main()
+        !Add your code here
+        ConfL\Off;
+        ConfJ\Off;
+        
+        Path_10;
+        Path_20;
+        Path_30;
+    
+        
+    ENDPROC
+    PROC Path_10()
+        MoveL Target_10,v1000,z5,UISpenholder\WObj:=wobj_Table1;
+        MoveL Target_20,v1000,z5,UISpenholder\WObj:=wobj_Table1;
+        MoveL Target_30,v1000,z5,UISpenholder\WObj:=wobj_Table1;
+        MoveL Target_40,v1000,z5,UISpenholder\WObj:=wobj_Table1;
+    ENDPROC
+    PROC Path_20()
+        MoveL Target_50,v1000,z5,UISpenholder\WObj:=wobj_Table1;
+        MoveL Target_60,v1000,z5,UISpenholder\WObj:=wobj_Table1;
+        MoveL Target_70,v1000,z5,UISpenholder\WObj:=wobj_Table1;
+        MoveL Target_80,v1000,z5,UISpenholder\WObj:=wobj_Table1;
+    ENDPROC
+    PROC Path_30()
+        MoveL Target_100,v1000,z5,UISpenholder\WObj:=wobj_Table1;
+        MoveL Target_110,v1000,z5,UISpenholder\WObj:=wobj_Table1;
+        MoveL Target_120,v1000,z5,UISpenholder\WObj:=wobj_Table1;
+        MoveL Target_130,v1000,z5,UISpenholder\WObj:=wobj_Table1;
+        MoveL Target_140,v1000,z5,UISpenholder\WObj:=wobj_Table1;
+        MoveL Target_150,v1000,z5,UISpenholder\WObj:=wobj_Table1;
+        MoveL Target_160,v1000,z5,UISpenholder\WObj:=wobj_Table1;
+        MoveL Target_170,v1000,z5,UISpenholder\WObj:=wobj_Table1;
+    ENDPROC
+ENDMODULE
