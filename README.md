@@ -1,4 +1,4 @@
-#### ABB-Robot ####
+#ABB-Robot
 
 Programming code related to various lab exercises with the ABB Robot IRB 140.
 
