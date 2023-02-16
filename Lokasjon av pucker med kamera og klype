@@ -1,1 +1,307 @@
-repository
+2.2 image acquisition.py
+1 from typing import Optional, Tuple, Final
+2 import cv2
+3 from pyzbar.pyzbar import decode
+4 from pyzbar.wrapper import ZBarSymbol
+5 import numpy as np
+6 import threading
+7 import time
+8
+9
+10 from helper_funcs import calc_robtarget
+11 from Camera import Camera
+12
+13 # CONSTANTS
+14 # Blur methods:
+15 GAUSSIAN: Final = "Gaussian"
+16 MEDIAN: Final = "Median"
+17 BILATERAL: Final = "Bilateral"
+18 # Contrast methods:
+19 NORMALIZE: Final = "Normalize"
+20 EQUALIZEHIST: Final = "Equalize Hist"
+21 LIN_TRANSFORM: Final = "Basic Linear Transform"
+22
+23 # GLOBAL VARIABLES
+24 qr_positions = None
+25 qr_pos_lock = threading.Lock()
+26
+27
+28 def init_camera() -> Camera:
+29 camera = Camera()
+30 camera.init()
+31 camera.set_parameters(False)
+32 camera.allocate_memory()
+33 camera.capture_video()
+34 return camera
+35
+36
+3
+37 def init_cv_camera(id: int) -> cv2.VideoCapture:
+38 return cv2.VideoCapture(id)
+39
+40
+41 def capture_image(cap: cv2.VideoCapture) -> Tuple[bool, any]:
+42 # Change resolution to 1280x960
+43 # cap.set(3, 1280)
+44 # cap.set(4, 960)
+45 ret, frame = cap.read()
+46 return ret, frame
+47
+48
+49 def filter_image(image: np.array, blur_method: str = GAUSSIAN) ->
+Optional[np.array]:
+50 """Reduce image noise, image, defaults to GAUSSIAN
+51 blur_method=GAUSSIAN, MEDIAN or BILATERAL"""
+52 # grayscale first? threshold?
+53 if blur_method == GAUSSIAN:
+54 filtered_image = cv2.GaussianBlur(image, (7, 7), sigmaX=5)
+55 # gaus_blur = cv2.GaussianBlur(image, (5,5),cv2.BORDER_DEFAULT)
+56 elif blur_method == MEDIAN:
+57 filtered_image = cv2.medianBlur(image, 3) # kernel size; odd and
+> 1
+58 elif blur_method == BILATERAL:
+59 filtered_image = cv2.bilateralFilter(image, d=3, sigmaColor=75,
+sigmaSpace=75)
+60 else:
+61 print(f"No blur method called {blur_method}")
+62 return None
+63 return filtered_image
+64
+65
+66 def lin_transform_image(
+67 image: np.array, alpha: float = 1.0, beta: int = 0
+68 ) -> Optional[np.array]:
+69 """Linear transform image to get better contrast"""
+70 new_image = np.zeros(image.shape, image.dtype)
+71 for y in range(image.shape[0]):
+72 for x in range(image.shape[1]):
+73 for c in range(image.shape[2]):
+74 new_image[y, x, c] = np.clip(alpha * image[y, x, c] +
+beta, 0, 255)
+75 return new_image
+76
+77
+78 def increase_image_contrast(
+79 image: np.array, contrast_method: str = NORMALIZE
+80 ) -> Optional[np.array]:
+81 """Increase the contrast to make QR code stand out more:
+82 check cv2.normalize, equalizehist and basic linear transform"""
+4
+83 if contrast_method == NORMALIZE:
+84 contrast_image = cv2.normalize(
+85 image, image, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX,
+dtype=-1
+86 )
+87 elif contrast_method == EQUALIZEHIST:
+88 try:
+89 contrast_image = cv2.equalizeHist(image)
+90 except Exception as err:
+91 print(f"Exception(maybe forgot to gray scale?): \n{err}\n")
+92 elif contrast_method == LIN_TRANSFORM:
+93 contrast_image = lin_transform_image(image)
+94 else:
+95 print(f"No contrast method called {contrast_method}")
+96 return None
+97 return contrast_image
+98
+99
+100 def decode_qr(image: np.array):
+101 """Decodes the QR code and returns robtarget?"""
+102 data = decode(image)
+103 return data
+104
+105
+106 def test_filter(image: np.array, blur_method: str = GAUSSIAN) -> None:
+107 filtered_image = filter_image(image, blur_method)
+108 cv2.imshow("Unfiltered", image)
+109 cv2.imshow(f"Filtered: {blur_method}", filtered_image)
+110 cv2.waitKey()
+111
+112
+113 def test_contrast(image: np, array, contrast_method: str = NORMALIZE) ->
+None:
+114 contrast_image = increase_image_contrast(image, contrast_method)
+115 cv2.imshow("Unfiltered", image)
+116 cv2.imshow(f"Contrast meth: {contrast_method}", contrast_image)
+117 cv2.waitKey()
+118
+119
+120 def test_videocapture(cap: cv2.VideoCapture) -> None:
+121 """Shows videofeed from camera"""
+122 try:
+123 while True:
+124 _, frame = capture_image(cap)
+125 cv2.imshow("Frames", frame)
+126 # Wait for 10ms, press q to quitq
+127 if cv2.waitKey(10) & 0xFF == ord("q"):
+128 break
+129 except Exception as err:
+130 print(f"Video has ended: {err}")
+5
+131
+132
+133 def video_capture(cam: Camera) -> None:
+134 while True:
+135 array = cam.get_image()
+136 _, array = get_qr_pos_from_image(array)
+137 cv2.imshow("Continuous video display", array)
+138 if cv2.waitKey(1) & 0xFF == ord("q"):
+139 break
+140
+141
+142 def video_capture_cv2(cap: cv2.VideoCapture) -> None:
+143 while True:
+144 ret, array = capture_image(cap)
+145 if ret:
+146 _, array = get_qr_pos_from_image(array)
+147 cv2.imshow("Continuous video display", array)
+148 if cv2.waitKey(10) & 0xFF == ord("q"):
+149 break
+150
+151
+152 def get_qr_pos(camera: Optional[Camera] = None) -> tuple[Optional[list],
+np.array]:
+153 """If camera is None (live feed running), try five times and see if
+qr position is updating
+154 if not qr position is outdated and we return None, if camera is
+Camera we take five images and
+155 and return the qr position"""
+156 i = 0
+157 if camera == None:
+158 global qr_positions
+159 qr_pos_lock.acquire()
+160 old_pos = qr_positions
+161 qr_pos_lock.release()
+162 while i < 50:
+163 i += 1
+164 time.sleep(0.1)
+165 qr_pos_lock.acquire()
+166 current_pos = qr_positions
+167 qr_pos_lock.release()
+168 if old_pos != current_pos:
+169 return current_pos
+170 else:
+171 while i < 5:
+172 image = camera.get_image()
+173 position = get_qr_pos_from_image(image)
+174 if position != None:
+175 return position
+176 i = i + 1
+177 return None
+6
+178
+179
+180 def get_qr_pos_from_image(image: np.array) -> tuple[Optional[list],
+np.array, np.array]:
+181 """Gets the QR code from image if there is any, (currently only
+returns first)"""
+182 processed_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+183 processed_image = filter_image(processed_image, BILATERAL)
+184 processed_image = increase_image_contrast(processed_image, NORMALIZE)
+185 data = decode_qr(processed_image)
+186 temp_positions = []
+187 if len(data) > 0:
+188 for index, qr_code in enumerate(data):
+189 points = qr_code.polygon # Extract two corner points
+190
+191 x_pos = [p[0] for p in points]
+192 y_pos = [p[1] for p in points]
+193 position = [
+194 sum(x_pos) / len(points),
+195 sum(y_pos) / len(points),
+196 ] # Calculate center of each QR code
+197 width, height, _ = image.shape
+198
+199 position = [
+200 position[0] - height / 2,
+201 position[1] - width / 2,
+202 ] # Make center of image (0,0)
+203 temp_positions.append(position)
+204
+205 # Draw box around qr code
+206 pts = np.array(
+207 [
+208 [x_pos[0], y_pos[0]],
+209 [x_pos[1], y_pos[1]],
+210 [x_pos[2], y_pos[2]],
+211 [x_pos[3], y_pos[3]],
+212 ]
+213 )
+214 cv2.polylines(image, [pts], True, (0, 255, 0), 5)
+215 cv2.putText(
+216 image,
+217 f"Index: {index}\n Pos: {position}",
+218 # org=(150, 250),
+219 org=(x_pos[0], y_pos[0]),
+220 fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+221 fontScale=1,
+222 color=(0, 0, 0),
+223 thickness=1,
+224 )
+225
+7
+226 global qr_positions
+227 qr_pos_lock.acquire()
+228 qr_positions = temp_positions
+229 qr_pos_lock.release()
+230 return temp_positions, image#, processed_image
+231 return None, image#, processed_image
+232
+233
+234 if __name__ == "__main__":
+235 cap = init_cv_camera(0)
+236
+237 cap_thread = threading.Thread(target=video_capture_cv2, args=(cap,),
+daemon=True)
+238 cap_thread.start()
+239
+240 while True:
+241 position = get_qr_pos()
+242 print(position)
+243 time.sleep(0.1)
+244
+245
+246 # video_capture_cv2(cap)
+247
+248 # camera = Camera()
+249 # camera.init()
+250 # camera.set_parameters()
+251 # camera.allocate_memory()
+252 # camera.capture_video()
+253
+254 # cap = cv2.VideoCapture(1)
+255 # frame = camera.get_image()
+256 # cv2.imshow("test", frame)
+257 # cv2.waitKey()
+258
+259 # data = decode(normalized_img, symbols=[ZBarSymbol.QRCODE])
+260
+261 # Show video in seperate thrad
+262 # cam_thread = threading.Thread(target=ImageFunctions.showVideo,
+args=(camera,), daemon=True)
+263 # cam_thread.start()
+264
+265 # camera = init_camera()
+266 # video_capture(camera)
+267 # cam_thread =
+threading.Thread(target=video_capture,args=(camera,),daemon=True)
+268 # cam_thread.start()
+269 # time.sleep(10)
+270 # video_capture(camera)
+271
+272 # _, frame = capture_image(cap)
+8
+273 # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+274 # blurred = filter_image(frame, BILATERAL)
+275 # contrast_image = increase_image_contrast(blurred, NORMALIZE)
+276 # data = decode_qr(contrast_image)
+277 # for QR_code in data:
+278 # print(QR_code.polygon)
+279 # cv2.imshow("test", contrast_image)
+280 # cv2.waitKey()
+281
+282 # frame = cv2.imread("ia4/REFERANSE_POS_CROPPED.jpg")
+283 # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+284 # test_filter(frame, BILATERAL)
+285 # test_contrast(frame, LIN_TRANSFORM)
+286 # test_videocapture(cap)
