@@ -1,1 +1,144 @@
-repository
+2.7 pythoncom.mod
+1 MODULE PythonCom
+2
+3 VAR num WPW:=0; ! What Python Wants
+4 VAR num WRD:=0; ! What RAPID Does
+5 VAR bool ready_flag:= FALSE; ! RAPID’s ready flag
+6 VAR bool image_processed:= FALSE; ! Python’s ready flag
+7 CONST num gripHeight:= 10;
+8 CONST num safeHeight:= 60; ! Close-up image height
+9
+10 ! To use norbert.send_puck()
+11 VAR num gripper_camera_offset{2};
+12 VAR num girpper_angle := 0;
+13
+14 ! Number of pucks on table
+15 VAR num num_of_pucks := 0;
+16
+17 ! Where the selected puck is located
+18 VAR robtarget puck_target :=
+[[0,0,200],[0,1,0,0],[-1,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+19
+20 VAR robtarget put_puck_target; ! Target used to place puck
+21 VAR num puck_angle; ! Angle puck should be rotated (optional)
+22
+23 CONST robtarget
+middleOfTable:=[[0,0,0],[0,1,0,0],[-1,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+24
+25 ! Overview image position
+26 VAR robtarget
+overview:=[[0,0,500],[0,1,0,0],[-1,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+27
+28 TASK PERS wobjdata wobjTableN:=
+29 [FALSE,TRUE,"",[[150,-500,8],[0.707106781,0,0,-0.707106781]],[[0,0,0],[1,0,0,0]]];
+30 PERS tooldata tGripper:=
+31 [TRUE,[[0,0,114.25],[0,0,0,1]],[1,[-0.095984607,0.082520613,38.69176324],[1,0,0,0],0,0,0]];
+32
+33 PROC main()
+34
+35 closeGripper(FALSE);
+36 MoveJ overview,v100,z10,tGripper\WObj:=wobjTableN;
+37
+38 ready_flag:=TRUE;
+39
+40 WHILE TRUE DO
+19
+41
+42 IF WPW <> 0 THEN
+43 WRD:=WPW;
+44 WPW:=0;
+45
+46 TEST WRD
+47
+48 CASE 1:
+49 ! Move chosen puck
+50 MoveJ overview,v200,z5,tGripper\WObj:=wobjTableN;
+51 ready_flag:=TRUE;
+52 wait_for_python;
+53 ! Move to a close up of puck
+54 MoveJ puck_target,v200,fine,tGripper\WObj:=wobjTableN;
+55 ready_flag:=TRUE;
+56 wait_for_python;
+57 !MoveJ puck_target,v200,fine,tGripper\WObj:=wobjTableN;
+58 !ready_flag:=TRUE;
+59 !wait_for_python;
+60 !MoveJ Offs(puck_target, -gripper_camera_offset{1},
+-gripper_camera_offset{2},
+safeHeight),vSpeed,z10,tGripper\WObj:=wobjTableN;
+61 get_puck;
+62 place_puck;
+63 ready_flag:=TRUE;
+64
+65 CASE 2:
+66 ! Stack pucks
+67 MoveJ overview,v400,z50,tGripper\WObj:=wobjTableN;
+68 ready_flag:=TRUE;
+69 wait_for_python;
+70 FOR i FROM 0 TO num_of_pucks - 1 DO
+71
+72 ENDFOR
+73
+74 ENDTEST
+75 ENDIF
+76 WRD:=0;
+77 ENDWHILE
+78 ENDPROC
+79
+80
+81 ! Pick up puck
+82 PROC get_puck()
+83 MoveL Offs(puck_target, 0, 0,
+safeHeight),v100,z10,tGripper\WObj:=wobjTableN;
+84 WaitTime(1);
+85 MoveL Offs(puck_target, 0, 0,
+gripHeight),v100,fine,tGripper\WObj:=wobjTableN;
+20
+86 MoveL Offs(puck_target, 50, 0,
+gripHeight),v100,fine,tGripper\WObj:=wobjTableN;
+87
+88 closeGripper(TRUE);
+89 MoveL Offs(puck_target, 0, 0, gripHeight +
+30),v100,fine,tGripper\WObj:=wobjTableN;
+90 ENDPROC
+91
+92 ! Place puck
+93 PROC place_puck()
+94 MoveL Offs(put_puck_target, 0, 0,
+gripHeight+30),v100,z10,tGripper\WObj:=wobjTableN;
+95 MoveL Offs(put_puck_target, 0, 0,
+gripHeight),v100,fine,tGripper\WObj:=wobjTableN;
+96 closeGripper(FALSE);
+97 MoveL Offs(put_puck_target, 0, 0,
+safeHeight),v100,z10,tGripper\WObj:=wobjTableN;
+98 ENDPROC
+99
+100 ! wait for python to finish processing image
+101 PROC wait_for_python()
+102 WHILE NOT image_processed DO
+103 ENDWHILE
+104 image_processed:=FALSE;
+105 ENDPROC
+106
+107 ! Function to open / close the gripper
+108 ! PROC closeGripper(bool state)
+109 ! WaitTime 0.1;
+110 ! IF state=TRUE THEN
+111 ! setDO PneumaticGripper, 1;
+112 ! ELSEIF state=FALSE THEN
+113 ! setDO PneumaticGripper, 0;
+114 ! ENDIF
+115 ! WaitTime 0.2;
+116 ! ENDPROC
+117 PROC closeGripper(bool state)
+118 WaitTime 0.1;
+119 IF state=TRUE THEN
+120 setDO AirValve1, 1;
+121 setDO AirValve2, 0;
+122 ELSEIF state=FALSE THEN
+123 setDO AirValve1, 0;
+124 setDO AirValve2, 1;
+125 ENDIF
+126 WaitTime 0.2;
+127 ENDPROC
+128
+129 ENDMODULE
