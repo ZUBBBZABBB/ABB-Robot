@@ -1,1 +1,698 @@
+%%
+% Opg 4.1
 
+%Initialize
+ABBrc = abbCom('Rudolf');
+abbMain;
+
+ABBrc = abbMaster(ABBrc); % Master access til roboten
+
+
+
+%Leser og lager structs
+WMW = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMa
+tlabComWMW'), 'num'));
+robtarget0 = abbRead(ABBrc, abbNew(char('T_ROB1','MatlabCom','pMatlabCom0'), 'robtarget')); % Lager ny robtarget struct
+
+% Edit structs
+robtarget0.Trans.X = 100;
+robtarget0.Trans.Y = 50;
+robtarget0.Trans.Z = 200;
+
+%Skriv nye structs til RAPID
+abbWrite(ABBrc, robtarget0);
+WMW.Value = 6;
+abbWrite(ABBrc, WMW); 
+
+
+%%
+% Opg 4.2
+ABBrc = abbCom('Rudolf');
+ABBrc = abbMaster(ABBrc);
+
+valg = 10; % Kjører meny første gang
+retning_x = -1; % Retningsvariabel x
+retning_y = -1; % Retningsvariabel y
+steglengde = 40; % Steglengde 
+
+WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+WMW = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWMW'), 'num'));
+
+
+% Får robot til trygg høyde
+robtarget0 = abbRead(ABBrc, abbNew(char('T_ROB1','MatlabCom','pMatlabCom0'), 'robtarget')); 
+robtarget0.Trans.Z = 100;
+robtarget0.Trans.X = 0;
+robtarget0.Trans.Y = 0;
+abbWrite(ABBrc, robtarget0);
+WMW.Value = 6;
+abbWrite(ABBrc, WMW) 
+
+
+% Loop kommando for klokke eller counter klokke bevegelse
+while true
+ 
+     % Leser fra RAPID robtarget til MATLAB robtarget struct
+     robtarget0 = abbRead(ABBrc, robtarget0); % Leser fra ønsket robot og ønsket robtarget
+
+     if valg == 10
+        clockWise = menu('Velg retning: ', ...
+            '1',... % Mot klokken
+            '2');   % Avslutt
+        
+     end
+   
+     if clockWise == 1
+         
+         for antall = 0:7 
+            robtarget0 = abbRead(ABBrc, robtarget0); 
+       
+            robtarget0.Trans.X = robtarget0.Trans.X +retning_x*steglengde; 
+            robtarget0.Trans.Y = robtarget0.Trans.Y +retning_y*steglengde;
+            
+         
+            abbWrite(ABBrc, robtarget0); % Skriver til RAPID
+            
+            % Venteløkke
+            word = true;
+            while word
+                
+                WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+                if WRD.Value == 0
+                    word = false;
+                end
+            end
+            
+            WMW.Value = 6;
+            abbWrite(ABBrc, WMW) 
+           
+            if antall == 1 % Endrer retning etter 2 hopp
+                retning_y = 1;
+            elseif antall == 3
+                retning_x = 1;
+            elseif antall == 5
+                retning_y = -1;
+            end
+         end
+         
+         robtarget0.Trans.Z = 100;
+         robtarget0.Trans.X = 0;
+         robtarget0.Trans.Y = 0;
+         abbWrite(ABBrc, robtarget0);
+         
+         
+     end
+
+    
+     
+     if clockWise == 2
+         break;
+     end
+     
+end
+
+
+
+
+%%
+%Opg 4.3
+
+ABBrc = abbCom('Rudolf');
+%abbMain;
+ABBrc = abbMaster(ABBrc); % Master access til roboten
+
+
+hastighetsmeny = 0; % Start verdi meny2
+choice = 0;     % Start verdi meny1
+steglengde = 50; % Start verdi steg lengde
+x = 0;
+y = 0;
+z = 0;
+
+% Leser og lager speed struct
+hastighet = abbNew(ABBrc, abbNew(char('T_ROB1','MatlabCom','nMatlabComNum1'), 'num'));
+
+% Lager robtargets structs
+robtarget0 = abbNew(char('T_ROB1','MatlabCom','pMatlabCom0'), 'robtarget'); % Lager ny robtarget struct
+robtarget1 = abbNew(char('T_ROB1','MatlabCom','pMatlabCom0'), 'robtarget'); % Lager ny robtarget struct
+robtarget2 = abbNew(char('T_ROB1','MatlabCom','pMatlabCom0'), 'robtarget'); % Lager ny robtarget struct
+
+% Lager kjøre kommanoder structer for matlab og rapid
+WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+WMW = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWMW'), 'num'));
+
+% Safe Height 
+robtarget0.Trans.X = 0;
+robtarget0.Trans.Y = 0;
+robtarget0.Trans.Z = 200;
+abbWrite(ABBrc, robtarget0);
+WMW.Value = 6;
+abbWrite(ABBrc, WMW) % Skriver til RAPID hva den skal gjøre nxt
+           
+
+% Starter meny for valg av jogg
+
+while true
+    choice = menu('Select what to do :', ...
+        'x++',...  % 1
+        'x--',...  % 2
+        'y++ ',...  % 3
+        'y--',...  % 4
+        'z++ ',...  % 5
+        'z--',...% 6
+        'Change step length' ,... % 7
+        'Change speed',... %8   
+        'Quit' ); % 9
+    
+    % Jog x++ retning
+    if choice == 1 
+        
+        % Leser fra structene
+        WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+        robtarget0 = abbRead(ABBrc, robtarget0); 
+        robtarget1 = abbRead(ABBrc, robtarget1); 
+        robtarget2 = abbRead(ABBrc, robtarget2);
+        
+        if WRD.Value ~= 6
+            robtarget0.Trans.X = robtarget0.Trans.X + steglengde;
+            abbWrite(ABBrc, robtarget0);
+         
+            WMW.Value = 6;
+            abbWrite(ABBrc, WMW) % Skriver til RAPID hva den skal gjøre nxt
+            
+        elseif WRD.Value ~=7
+            robtarget1.Trans.X = robtarget1.Trans.X + steglengde;
+            abbWrite(ABBrc, robtarget1); % Skriver til RAPID robtarget
+            
+            % Venteløkke
+            word = true;
+            while word
+                
+                WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+                if WRD.Value == 0
+                    word = false;
+                end
+            end
+            
+            WMW.Value = 7;
+            abbWrite(ABBrc, WMW) % Skriver til RAPID hva den skal gjøre nxt
+            
+        elseif WRD.Value ~=8
+            robtarget2.Trans.X = robtarget2.Trans.X + steglengde;
+            abbWrite(ABBrc, robtarget2); % Skriver til RAPID robtarget
+            
+            % Venteløkke
+            word = true;
+            while word
+                
+                WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+                if WRD.Value == 0
+                    word = false;
+                end
+            end
+            
+            ABBrc.WMW.Value = 8;
+            abbWrite(ABBrc, WMW) % Skriver til RAPID hva den skal gjøre nxt
+        end
+    end
+    
+    % Jog x-- retning
+    if choice == 2
+        WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+        robtarget0 = abbRead(ABBrc, robtarget0); % Leser fra ønsket robot og ønsket robtarget
+        robtarget1 = abbRead(ABBrc, robtarget1); % Leser fra ønsket robot og ønsket robtarget
+        robtarget2 = abbRead(ABBrc, robtarget2); % Leser fra ønsket robot og ønsket robtarget
+        
+        if WRD.Value ~= 6
+            robtarget0.Trans.X = robtarget0.Trans.X - steglengde;
+            abbWrite(ABBrc, robtarget0); % Skriver til RAPID robtarget
+            
+            % Venteløkke
+            word = true;
+            while word
+                
+                WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+                if WRD.Value == 0
+                    word = false;
+                end
+            end
+            
+            WMW.Value = 6;
+            abbWrite(ABBrc, WMW) % Skriver til RAPID hva den skal gjøre nxt
+            
+        elseif WRD.Value ~=7
+            robtarget1.Trans.X = robtarget1.Trans.X - steglengde;
+            abbWrite(ABBrc, robtarget1); % Skriver til RAPID robtarget
+            
+            % Venteløkke
+            word = true;
+            while word
+                
+                WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+                if WRD.Value == 0
+                    word = false;
+                end
+            end
+            
+            WMW.Value = 7;
+            abbWrite(ABBrc, WMW) % Skriver til RAPID hva den skal gjøre nxt
+            
+        elseif WRD.Value ~=8
+            robtarget2.Trans.X = robtarget2.Trans.X - steglengde;
+            abbWrite(ABBrc, robtarget2); % Skriver til RAPID robtarget
+            
+            % Venteløkke
+            word = true;
+            while word
+                
+                WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+                if WRD.Value == 0
+                    word = false;
+                end
+            end
+            
+            ABBrc.WMW.Value = 8;
+            abbWrite(ABBrc, WMW) % Skriver til RAPID hva den skal gjøre nxt
+        end
+    end
+    
+    % Jog y++ retning
+    if choice == 3 
+        WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+        robtarget0 = abbRead(ABBrc, robtarget0); % Leser fra ønsket robot og ønsket robtarget
+        robtarget1 = abbRead(ABBrc, robtarget1); % Leser fra ønsket robot og ønsket robtarget
+        robtarget2 = abbRead(ABBrc, robtarget2); % Leser fra ønsket robot og ønsket robtarget
+        
+        if WRD.Value ~= 6
+            robtarget0.Trans.Y = robtarget0.Trans.Y + steglengde;
+            abbWrite(ABBrc, robtarget0); % Skriver til RAPID robtarget
+            
+            % Venteløkke
+            word = true;
+            while word
+                
+                WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+                if WRD.Value == 0
+                    word = false;
+                end
+            end
+            
+            WMW.Value = 6;
+            abbWrite(ABBrc, WMW) % Skriver til RAPID hva den skal gjøre nxt
+            
+        elseif WRD.Value ~=7
+            robtarget1.Trans.Y = robtarget1.Trans.Y + steglengde;
+            abbWrite(ABBrc, robtarget1); % Skriver til RAPID robtarget
+            
+            % Venteløkke
+            word = true;
+            while word
+                
+                WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+                if WRD.Value == 0
+                    word = false;
+                end
+            end
+            
+            WMW.Value = 7;
+            abbWrite(ABBrc, WMW) % Skriver til RAPID hva den skal gjøre nxt
+            
+        elseif WRD.Value ~=8
+            robtarget2.Trans.Y = robtarget2.Trans.Y + steglengde;
+            abbWrite(ABBrc, robtarget2); % Skriver til RAPID robtarget
+            
+            % Venteløkke
+            word = true;
+            while word
+                
+                WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+                if WRD.Value == 0
+                    word = false;
+                end
+            end
+            
+            WMW.Value = 8;
+            abbWrite(ABBrc, WMW) % Skriver til RAPID hva den skal gjøre nxt
+        end
+    end
+    
+    % Jog y-- retning
+    if choice == 4 
+        WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+        robtarget0 = abbRead(ABBrc, robtarget0); % Leser fra ønsket robot og ønsket robtarget
+        robtarget1 = abbRead(ABBrc, robtarget1); % Leser fra ønsket robot og ønsket robtarget
+        robtarget2 = abbRead(ABBrc, robtarget2); % Leser fra ønsket robot og ønsket robtarget
+        
+        if WRD.Value ~= 6
+            robtarget0.Trans.Y = robtarget0.Trans.Y - steglengde;
+            abbWrite(ABBrc, robtarget0); % Skriver til RAPID robtarget
+            
+            % Venteløkke
+            word = true;
+            while word
+                
+                WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+                if WRD.Value == 0
+                    word = false;
+                end
+            end
+            
+            WMW.Value = 6;
+            abbWrite(ABBrc, WMW) % Skriver til RAPID hva den skal gjøre nxt
+            
+        elseif WRD.Value ~=7
+            robtarget1.Trans.Y = robtarget1.Trans.Y - steglengde;
+            abbWrite(ABBrc, robtarget1); % Skriver til RAPID robtarget
+            
+            % Venteløkke
+            word = true;
+            while word
+                
+                WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+                if WRD.Value == 0
+                    word = false;
+                end
+            end
+            
+            
+            WMW.Value = 7;
+            abbWrite(ABBrc, WMW) % Skriver til RAPID hva den skal gjøre nxt
+            
+        elseif WRD.Value ~=8
+            robtarget2.Trans.Y = robtarget2.Trans.Y - steglengde;
+            abbWrite(ABBrc, robtarget2); % Skriver til RAPID robtarget
+            
+            % Venteløkke
+            word = true;
+            while word
+                
+                WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+                if WRD.Value == 0
+                    word = false;
+                end
+            end
+            
+            WMW.Value = 8;
+            abbWrite(ABBrc, WMW) % Skriver til RAPID hva den skal gjøre nxt
+        end
+     
+    end
+    
+    % Jog z++ retning
+    if choice == 5
+        WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+        robtarget0 = abbRead(ABBrc, robtarget0); % Leser fra ønsket robot og ønsket robtarget
+        robtarget1 = abbRead(ABBrc, robtarget1); % Leser fra ønsket robot og ønsket robtarget
+        robtarget2 = abbRead(ABBrc, robtarget2); % Leser fra ønsket robot og ønsket robtarget
+        
+        if WRD.Value ~= 6
+            robtarget0.Trans.Z = robtarget0.Trans.Z + steglengde;
+            abbWrite(ABBrc, robtarget0); % Skriver til RAPID robtarget
+            
+            % Venteløkke
+            word = true;
+            while word
+                
+                WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+                if WRD.Value == 0
+                    word = false;
+                end
+            end
+            
+            WMW.Value = 6;
+            abbWrite(ABBrc, WMW) % Skriver til RAPID hva den skal gjøre nxt
+            
+        elseif WRD.Value ~=7
+            robtarget1.Trans.Z = robtarget1.Trans.Z + steglengde;
+            abbWrite(ABBrc, robtarget1); % Skriver til RAPID robtarget
+            
+            % Venteløkke
+            word = true;
+            while word
+                
+                WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+                if WRD.Value == 0
+                    word = false;
+                end
+            end
+            
+            WMW.Value = 7;
+            abbWrite(ABBrc, WMW) % Skriver til RAPID hva den skal gjøre nxt
+            
+        elseif WRD.Value ~=8
+            robtarget2.Trans.Z = robtarget2.Trans.Z + steglengde;
+            abbWrite(ABBrc, robtarget2); % Skriver til RAPID robtarget
+            
+            % Venteløkke
+            word = true;
+            while word
+                
+                WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+                if WRD.Value == 0
+                    word = false;
+                end
+            end
+            
+            WMW.Value = 8;
+            abbWrite(ABBrc, WMW) % Skriver til RAPID hva den skal gjøre nxt
+        end
+    end
+    
+    % Jog z-- retning
+    if choice == 6 
+        WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+        robtarget0 = abbRead(ABBrc, robtarget0); % Leser fra ønsket robot og ønsket robtarget
+        robtarget1 = abbRead(ABBrc, robtarget1); % Leser fra ønsket robot og ønsket robtarget
+        robtarget2 = abbRead(ABBrc, robtarget2); % Leser fra ønsket robot og ønsket robtarget
+        
+        if WRD.Value ~= 6
+            robtarget0.Trans.Z = robtarget0.Trans.Z - steglengde;
+            abbWrite(ABBrc, robtarget0); % Skriver til RAPID robtarget
+            
+            % Venteløkke
+            word = true;
+            while word
+                
+                WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+                if WRD.Value == 0
+                    word = false;
+                end
+            end
+            
+            WMW.Value = 6;
+            abbWrite(ABBrc, WMW) % Skriver til RAPID hva den skal gjøre nxt
+            
+        elseif WRD.Value ~=7
+            robtarget1.Trans.Z = robtarget1.Trans.Z - steglengde;
+            abbWrite(ABBrc, robtarget1); % Skriver til RAPID robtarget
+            
+            % Venteløkke
+            word = true;
+            while word
+                
+                WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+                if WRD.Value == 0
+                    word = false;
+                end
+            end
+            
+            WMW.Value = 7;
+            abbWrite(ABBrc, WMW) % Skriver til RAPID hva den skal gjøre nxt
+            
+        elseif WRD.Value ~=8
+            robtarget2.Trans.Z = robtarget2.Trans.Z - steglengde;
+            abbWrite(ABBrc, robtarget2); % Skriver til RAPID robtarget
+            
+            % Venteløkke
+            word = true;
+            while word
+                
+                WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+                if WRD.Value == 0
+                    word = false;
+                end
+            end
+            
+            WMW.Value = 8;
+            abbWrite(ABBrc, WMW) % Skriver til RAPID hva den skal gjøre nxt
+        end
+    end
+    
+    % Endre steglengde for jogg
+    if choice == 7
+        steglengde = input (' Give step length [mm] : ') ;
+    end
+
+    % Endre hastighet til roboten
+    if choice ==8
+         hastighetsmeny = menu('Select new speed of robot : ', ...
+        'v10',...  % 1
+        'v50' ,... % 2
+        'v100' ,... % 3
+        'v250' ,... % 4
+        'v500' ,... % 5
+        'v1000' ,... % 6
+        'v2000' ,... % 7
+        'v1',...  %8 
+        'Quit' ); % 9
+         
+        if hastighetsmeny == 1
+            hastighet.Value = 10;
+            abbWrite(ABBrc, hastighet)
+            WMW = 4;
+            abbWrite(ABBrc, ABBrc.WMW) 
+        end
+        
+        if hastighetsmeny == 2
+            hastighet.Value = 50;
+            abbWrite(ABBrc, hastighet) 
+            WMW = 4;
+            abbWrite(ABBrc, ABBrc.WMW) 
+        end
+        
+        if hastighetsmeny == 3
+            hastighet.Value = 100;
+            abbWrite(ABBrc, hastighet) 
+            WMW = 4;
+            abbWrite(ABBrc, ABBrc.WMW)
+        end
+        
+        
+        if hastighetsmeny == 4
+            hastighet.Value = 250;
+            abbWrite(ABBrc, hastighet)
+            WMW = 4;
+            abbWrite(ABBrc, ABBrc.WMW) 
+        end
+        
+        if hastighetsmeny == 5
+            hastighet.Value = 500;
+            abbWrite(ABBrc, hastighet) 
+            WMW = 4;
+            abbWrite(ABBrc, ABBrc.WMW) 
+        end
+        
+        if hastighetsmeny == 6
+            hastighet.Value = 1000;
+            abbWrite(ABBrc, hastighet) 
+            WMW = 4;
+            abbWrite(ABBrc, ABBrc.WMW) 
+        end
+        
+        if hastighetsmeny == 7
+            hastighet.Value = 2000;
+            abbWrite(ABBrc, hastighet) 
+            WMW = 4;
+            abbWrite(ABBrc, ABBrc.WMW) 
+        end
+        
+        if hastighetsmeny == 8
+            hastighet.Value = 1;
+            abbWrite(ABBrc, hastighet) 
+            WMW = 4;
+            abbWrite(ABBrc, ABBrc.WMW) 
+        end
+        
+        if hastighetsmeny == 9
+            break ;  
+        end
+    end
+        
+    % Avslutt alt
+    if choice == 9
+        break ;
+    end
+        
+end
+
+%% 
+% Opg 4.4
+
+clc
+clear
+
+ABBrc = abbCom('Rudolf');
+%abbMain;
+ABBrc = abbMaster(ABBrc); 
+
+
+hastighetsmeny = 0; % Start verdi meny2
+choice = 0;     % Start verdi meny1
+steglengde = 10; % Start verdi steg lengde
+start = 0; % Start variabel for fylling av blomst matrise
+krav_sistematrise=0; % Matrise fyllings krav
+
+maxlengde_rapidmatrise_verdi = 0; 
+
+
+% Lager kjøre kommanoder structer for matlab og rapid
+WRD = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWRD'), 'num'));
+WMW = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWMW'), 'num'));
+
+% Lager speed struct
+hastighet = abbNew(ABBrc, abbNew(char('T_ROB1','MatlabCom','nMatlabComNum1'), 'num'));
+
+% Lager robtargets og leser nåværede verdi
+robtarget0 = abbNew(char('T_ROB1','MatlabCom','pMatlabCom0'), 'robtarget'); % Lager ny robtarget struct
+%maxlengde_rapidmatrise = abbRead(ABBrc, abbNew(char('T_ROB1','MatlabCom','pMatlabCom0'), 'nMatlabComMAXLEN')); %Max lengde på matrise i rapid
+maxlengde_rapidmatrise = 50;
+%Matrise 1 fra RAPID 
+matriselengde1 = abbNew(char('T_ROB1','MatlabCom','nMatlabComLen1'), 'num'); % Current lengde på matrisen1 i RAPID
+matrise_x1 = abbNew(char('T_ROB1','MatlabCom','nMatlabComArrayX1'), 'num'); 
+matrise_y1 = abbNew(char('T_ROB1','MatlabCom','nMatlabComArrayY1'), 'num'); 
+matrise_z1 = abbNew(char('T_ROB1','MatlabCom','nMatlabComArrayZ1'), 'num'); 
+
+%Matrise2 fra RAPID
+matriselengde2 = abbNew(char('T_ROB1','MatlabCom','nMatlabComLen2'), 'num');  % Current lengde på matrisen2 i RAPID
+matrise_x2 = abbNew(char('T_ROB1','MatlabCom','nMatlabComArrayX2'), 'num'); 
+matrise_y2 = abbNew(char('T_ROB1','MatlabCom','nMatlabComArrayY2'), 'num');
+matrise_z2 = abbNew(char('T_ROB1','MatlabCom','nMatlabComArrayZ2'), 'num');
+
+
+
+% Starter meny for valg av program
+while true
+    choice = menu('Select what to do :', ...
+        'Start tegning av blomst, følg instruksjon på "FlexPendant"...',...  % 1
+        'Quit'); % 2
+    
+
+    
+    if choice == 1
+            [x, y, z] = lab4_path(1); % Lager 183 stk punkt ROSE for xyz-akser
+            arrXYZ_alle = [x,y,z]; % Matrise med alle punkt
+            
+            arrXYZ1 = arrXYZ_alle(1:50 , 1:3); % Fyller en matrise (begrenset av lengden i rapid) med elementer fra matrisen som inneholder alle punktene til rosen som skal tegnes
+            arrXYZ2 = arrXYZ_alle(51:100, 1:3);
+            arrXYZ3 = arrXYZ_alle(101:150, 1:3);
+            arrXYZ4 = arrXYZ_alle(151:183, 1:3);
+            
+            lengde = 50;
+            idx = 0;
+            
+            while 1
+                WMW = abbRead(ABBrc, abbNew(char('T_ROB1', 'MatlabCom', 'nMatlabComWMW'), 'num'));
+                if WMW.Value == 0 
+                    switch idx
+                        case 0
+                            abbWriteArray(ABBrc, arrXYZ1);
+                            idx = idx + 1
+                        case 1
+                            abbWriteArray(ABBrc, arrXYZ2); 
+                            idx = idx + 1
+                        case 2
+                            abbWriteArray(ABBrc, arrXYZ3);
+                            idx = idx + 1
+                        case 3
+                            abbWriteArray(ABBrc, arrXYZ4);
+                            break
+                    end
+                end
+            end
+    end
+    
+    
+    if choice == 2
+        break;
+    end
+end
